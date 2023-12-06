@@ -13,3 +13,7 @@ The Small World of Words project is crowd-sourced project to map the lexicon in 
 
 
 A copy of the workshop slides is also [available](./presentation/MultiscaleSemanticNetworksDeDeyne2023.pdf).
+
+You can view the html files without cloning by prepending any HTML file in the repository with https://htmlpreview.github.io/? e.g.:
+
+`https://github.com/SimonDeDeyne/workshop/blob/master/visualizationDemo.nb.html`
