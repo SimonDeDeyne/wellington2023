@@ -53,6 +53,7 @@ katzIndex = function(P,alpha){
 # Matrix cosine similarity
 cosineMatrix = function(G){
   G = Matrix::as.matrix(G)
+  #G = as_adjacency_matrix(G,attr = "weight",sparse = T)
   if(class(G)[1] == 'dgeMatrix' || class(G)[1] == 'dgCMatrix' || class(G)[1] == 'matrix'){
     Gn = normalize(G,norm = 'l2')
     S = tcrossprod(Gn)

@@ -1,5 +1,4 @@
 
-
 # Wellington Vocabulary Research Summer School
 
 ## An introduction to multi-scale semantic network analysis

@@ -294,7 +294,10 @@ getPPMI <- function(G){
     P@x = log2(P@x)
     P   = pmax(P,0)
     P   = normalize(P,'l1')
-    P   = igraph::graph_from_adjacency_matrix(P,weighted=T,mode = 'directed')
+    labels = rownames(P)
+    P  = igraph::graph_from_adjacency_matrix(P,weighted=T,
+                                              mode = 'directed')
+    igraph::V(P)$name=labels
     return(P)
 }
 
