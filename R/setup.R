@@ -17,7 +17,7 @@ library(ggrepel)
 library(gridExtra)
 library(graphlayouts)
 
-library(comato) # Pathfinder graphs
+#library(comato) # Pathfinder graphs
 library(assortnet) # Assortativity Analysis
 
 # also required: psych

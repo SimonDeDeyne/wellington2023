@@ -245,6 +245,8 @@ PPMI = function(P){
   return(P2)
 }
 
+
+
 # Negative point-wise mutual information
 NPMI = function(P){
   if(class(P)[1] == 'tbl_graph'){
@@ -266,22 +268,26 @@ NPMI = function(P){
 # Normalize sparse matrices (to use with random walk representations)
 # taken from https://github.com/dselivanov/text2vec/blob/master/R/utils_matrix.R
 normalize = function(m, norm = c("l1", "l2", "none")) {
+  tmp_names =  dimnames(m)
   norm = match.arg(norm)
-
+  
   if (norm == "none")
     return(m)
-
+  
   norm_vec = switch(norm,
                     l1 = 1 / Matrix::rowSums(m),
                     l2 = 1 / sqrt(Matrix::rowSums(m ^ 2))
   )
   # case when sum row elements == 0
   norm_vec[is.infinite(norm_vec)] = 0
-
+  
   if(inherits(m, "sparseMatrix"))
-    Matrix::Diagonal(x = norm_vec) %*% m
+    m = Matrix::Diagonal(x = norm_vec) %*% m
   else
-    m * norm_vec
+    m = m * norm_vec
+  
+  dimnames(m) = tmp_names
+  return(m)
 }
 
 
