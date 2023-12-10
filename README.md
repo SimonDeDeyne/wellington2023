@@ -9,9 +9,9 @@ A copy of the workshop slides is also [available](./presentation/MultiscaleSeman
 
 You can view the html files without cloning by prepending any HTML file in the repository with https://htmlpreview.github.io/? e.g.:
 
-[https://htmlpreview.github.io/?https://github.com/SimonDeDeyne/wellington2023/blob/main/R/centralityDemo.nb.html](https://htmlpreview.github.io/?https://github.com/SimonDeDeyne/wellington2023/blob/main/R/centralityDemo.nb.html)
-`https://htmlpreview.github.io/?https://github.com/SimonDeDeyne/wellington2023/blob/main/R/similarityDemo.nb.html`
-`https://htmlpreview.github.io/?https://github.com/SimonDeDeyne/wellington2023/blob/main/R/assortativityDemo.nb.html`
+* [Centrality demo](https://htmlpreview.github.io/?https://github.com/SimonDeDeyne/wellington2023/blob/main/R/centralityDemo.nb.html)
+* [Smilarity demo](https://htmlpreview.github.io/?https://github.com/SimonDeDeyne/wellington2023/blob/main/R/similarityDemo.nb.html)
+* [Assortativity and clustering demo](https://htmlpreview.github.io/?https://github.com/SimonDeDeyne/wellington2023/blob/main/R/assortativityDemo.nb.html)
 
 ### Disclaimer
 Note that the SWOW data are licensed under a Creative Commons Attribution-NonCommercial-NoDerivs 3.0 Unported License. They cannot be redistributed or used for commercial purposes. The full datasets can be obtained from the [Small World of Words research page](https://smallworldofwords.org/en/project/research).
