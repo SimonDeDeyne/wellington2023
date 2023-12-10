@@ -1,0 +1,357 @@
+---
+title: "Network communities and assortativity"
+author: "Simon De Deyne"
+date: "`r Sys.Date()`"
+output:
+  html_notebook:
+    toc: yes
+    toc_float: yes
+    theme: simplex
+  html_document:
+    highlighter: kate
+    toc: yes
+    df_print: paged
+bibliography: workshop.bib
+---
+<style type="text/css">
+body{
+  font-size: 12pt;
+}
+
+pre code {
+font-weight: 500;
+font-size: 11pt;
+}
+</style>
+
+```{r setup,include = FALSE,message=FALSE}
+source('setup.R')
+source('./functions/networkVisualization.R')
+source('./functions/networkFunctions.R')
+
+```
+
+# Community Clustering
+Many networks exhibit community structure. These communities consist of sets of nodes that have a larger degree of interconnectivity within their group compared to connections with other nodes. 
+Several algorithms can be used to detect these communities, each with their own strengths and weaknesses [see for instance  @lancichinetti2011limits]. This makes it difficult to recommend a single *best* approach (more information on how this applies to algorithms in graph is available [here](https://people.duke.edu/~jmoody77/snh/2021/CommunitiesSNH2021.nb.html). Moreover, some of the more popular ones like the 
+Louvain (`cluster_louvain()`) or Leiden community detection algorithms included in `igraph` only work for undirected networks, whereas others might struggle with very
+ large graphs (e.g. the `cluster_betweenness` algorithm).
+
+Below, we'll focus on relatively simple approaches. More sophisticated approaches capable of detecting overlapping and nested communities based on statistical communities are also worth exploring [@lancichinetti2011oslom;@dedeyne2015].
+
+```{r importGraph, echo=TRUE, warning=FALSE,message=FALSE, results = 'hide'}
+load('../data/WAT/USF.rda',verbose = F) %>% as_tibble()
+X = USF
+
+# Remove loops
+X %<>% filter(cue != response)
+
+# Recalculate strength
+cue.freq = X %>% group_by(cue) %>% summarise(total = sum(R1))
+X = left_join(X,cue.freq,by = 'cue') %>% mutate(R1.Strength =  R1/total)
+
+# Import the graph
+G = graph_from_data_frame(X %>% select(from = cue,to=response),directed = T)
+G = set_edge_attr(G,'weight',value = X$R1.Strength)
+
+# Extract largest strongly connected component
+Comp = extractComponent(G,mode = 'strong')
+
+# Reduce to the largest connected component
+G  = Comp$subGraph
+
+```
+
+
+## Evaluating communities
+
+### Walktrap
+As a first demonstration, we'll use the Walktrap algorithm.
+According to the `igraph` documentation the `cluster_walktrap` function tries to find densely connected subgraphs, also called communities in a graph via random walks. The idea is that short random walks tend to stay in the same community. 
+
+The algorithm has been shown to be robust, and is commonly used. In the igraph implementation edge directions are ignored. You also need to determine the maximum `steps`, that is the length of the
+random walks to perform (see [Optimizing Walktrap’s Community Detection in Networks Using the Total Entropy Fit Index](https://osf.io/preprints/psyarxiv/9pj2m) for approaches that do this automatically).
+
+
+```{r edgebetweenness}
+# Conduct walktrap clustering with random walks up to 3 steps
+C.walktrap = cluster_walktrap(as.undirected(G,mode = 'collapse'), 
+                              steps = 3)
+
+# Save results in a tibble
+X.walktrap = tibble(
+              word = names(membership(C.walktrap)),
+              Ci = as.integer(membership(C.walktrap)), 
+              algorithm = 'walktrap')
+
+```
+
+### Infomap
+The infomap community detection algorithm is a stochastic optimization-based algorithm that works for directed and weighted grpahs. Communities are iteratively merged together to optimize information flow and the algorithm stops when no further optimization is possible. It finds community structure that minimizes the expected description length of a random walker trajectory. This might take a few minutes depending on your device and the size of the network.
+```{r infomap}
+C.infomap = cluster_infomap(G)
+X.infomap = tibble(word = names(membership(C.infomap)),
+                   Ci = as.integer(membership(C.infomap)),
+                   algorithm = 'infomap')
+
+```
+## Comparing communities
+One interesting measure is `Q` or the modularity score. This score between 0 and 1
+indicates the proportion of edges within commnunities, relative to the expected proportion of edges in a similar where all edges would be placed randomly.
+For the walktrap and Infomap solutions these were respectively `r round(modularity(C.walktrap),3)`, and `r round(modularity(C.infomap),3)`.
+
+Let's now look at concrete example to further explore communities.
+Take the example `r targetword` and compare the other members for both algorithms.
+
+```{r exampleClusters}
+targetword = 'apple'
+exampleClusters = rbind(
+  X.infomap %>% filter(Ci == X.infomap %>% filter(word == targetword) %>% pull(Ci)),
+  X.walktrap %>% filter(Ci == X.walktrap %>% filter(word == targetword) %>% pull(Ci)))
+                  
+exampleClusters = pivot_wider(exampleClusters %>% mutate(value = 1),
+id_cols = 'word', names_from = c('algorithm'), values_from = c('value'),
+values_fill = 0)
+
+prop.overlap = exampleClusters %>% 
+        filter(infomap==1,walktrap==1) %>% nrow() / exampleClusters %>% nrow()
+
+
+DT::datatable(exampleClusters)
+```
+
+The overlap between both clusters is relatively high, `r round(prop.overlap*100)` percent. Importantly, both algorithms seem to include the same kind of words
+and provide relatively similarly sized clusters.
+
+To do this more systematically, we can use the `compare` function with the 
+`normalized mutual information` (NMI) method see [A Comparative Analysis of Community Detection Algorithms on Artificial Networks](https://www.nature.com/articles/srep30750]) for more details. 
+
+```{r compareClustering}
+nmi = compare(membership(C.walktrap),membership(C.infomap),method ='nmi')
+
+```
+The NMI value can range between 0 and 1. Consistent with the example, we find a 
+relatively high value of `r round(nmi,3)`. It's often also useful to plot the
+distribution of clusters and their sizes as well. 
+
+
+```{r plotInfomapClusterHistogram, fig.show=T}
+X.clustering = rbind(X.walktrap, X.infomap)
+
+fig.clustering.hist = ggplot(X.clustering, aes(x = Ci,fill=algorithm)) + 
+    geom_histogram(color = 'black', bins = 24) + 
+    scale_fill_viridis(discrete = T, option = 'rocket') +
+    facet_grid(algorithm ~ .) +
+    theme_minimal()
+
+print(fig.clustering.hist)
+
+```
+
+This plot shows a large difference in the nature of the distribution (technical detail: other comparison methods such as the adjusted rand index are more sensitive to this
+difference in granularity). Walktrap identifies a very large cluster containing
+`r max(X.walktrap %>% group_by(Ci) %>% tally() %>% pull(n))` words.
+
+
+
+# Assortativity Analysis
+Assortativity is the tendency for nodes that share a property to be connected.
+In social network analysis, this is often referred to as homophily. 
+In the context of semantic network analysis where networks are derived from word association data, assortativity reflects structural or processing biases where general properties of the cue word prime properties of the target word.
+The cumulative effect of assortativity at the micro-scale often corresponds to a general organisation at the macro-scale. The same mechanism can also be used to infer missing properties from nodes which might be used to predict how concrete or emotional a word is. 
+
+One interesting property of the assortativity coefficient is that it is one of 
+the few measures that can be compared across different networks [@farine2014].
+
+The following demo will show you how to quantify and evaluate assortativity patterns.
+We'll need a special package to extend igraphs' basic functionality to weighed neworks, which is available in the [assortnet](https://cran.r-project.org/web/packages/assortnet/assortnet.pdf) R package. 
+
+
+```{r loadProperties}
+file.concreteness = '../../data/concreteness/english.concreteness.Brysbaert2016.csv'
+X.con = read_delim(file.concreteness,delim = '\t')
+X.con %<>% select(word = Word, concreteness = Conc.M)
+
+file.valence = '../../data/valenceArousal/VADRatingsWarriner2013.csv'
+X.val = read_csv(file.valence)
+X.val %<>% select(word = Word, 
+                 valence = V.Mean.Sum, 
+                 arousal = A.Mean.Sum, 
+                 dominance = D.Mean.Sum)
+
+file.wf = '../../data/wordFrequency/subtlex_us.csv'
+X.wf = read_csv(file.wf)
+X.wf %<>% select(word = Word, logWF = Lg10WF,POS = Dom_PoS_SUBTLEX,pctPOS = Percentage_dom_PoS)
+
+# Join datatables
+X.norms = inner_join(X.con,X.val,by = 'word') %>% inner_join(., X.wf, by = 'word')
+
+# Extract vertices and their names
+X.vertices = tibble(word = V(G)$name)
+X.vertices = left_join(X.vertices, X.norms, by = 'word')
+
+# Add vertex attributes
+#G %<>% set_vertex_attr(name = 'concreteness', value = X.vertices$concreteness)
+#G %<>% set_vertex_attr(name = 'valence', value = X.vertices$valence)
+#G %<>% set_vertex_attr(name = 'POS', value = X.vertices$POS)
+#G %<>% set_vertex_attr(name = 'logWF', value = X.vertices$logWF)
+
+
+```
+## Continuous properties
+Continuous properties are scalars that apply to nodes. These are typically sourced from corpora or psycholinguistic norms.In this case, we'll focus on two of the most important
+ semantic dimensions: word concreteness [@Brysbaert2014] and affective valence [@warriner2013]. 
+
+```{r continuousAssortativity}
+S.assort = list()
+S.assort$concreteness = assortment.continuous(
+  as_adjacency_matrix(G,attr = "weight",sparse = T), 
+  vertex_values = X.vertices$concreteness,
+  weighted = T,
+  SE = T,
+  M = 5000,
+  na.rm = T)
+
+S.assort$valence= assortment.continuous(
+  as_adjacency_matrix(G,attr = "weight",sparse = T), 
+  vertex_values = X.vertices$valence,
+  weighted = T,
+  SE = T,
+  M = 5000,
+  na.rm = T)
+
+
+S.assort$wf= assortment.continuous(
+  as_adjacency_matrix(G,attr = "weight",sparse = T), 
+  vertex_values = X.vertices$logWF,
+  weighted = T,
+  SE = T,
+  M = 5000,
+  na.rm = T)
+
+```
+
+
+
+## Discrete properties
+Discrete properties can indicate morpho-syntactic information such as part-of-speech or gender, or semantic information (e.g., a superordinate label, or semantic field).
+`assortnet` also provides the mixing matrix. This matrix show the distribution of edges between each category using the binary network with row sums ($ai$) and column sums ($bi$).
+
+```{r discreteAssortativity}
+S.assort$pos= assortment.discrete(
+  as_adjacency_matrix(G,attr = "weight",sparse = T), 
+  types = X.vertices$POS,
+  weighted = T,
+  SE = T,
+  M = 5000,
+  na.rm = T)
+
+```
+
+As can be seen from the mixing matrix, most of the repsonses 
+are nouns (about 64%), followed by verbs (18%) and adjectives (17%).
+In general, word associations have a noun bias, which means that
+there's a relatively large proportion of nouns produced even when 
+the cue is a verb or adjective (see De Deyne et al, 2008).
+
+### Permutation test
+To determine how unexpected the degree of assortativity is, we can set up a comparison where the observed assortativity values are compared with networks that have the exact same pattern of connections (i.e., network toplogy), but with the node covariates permuted. Repeating this procedure (e.g. 1000 times) gives us a distribution of permuted assortativity values. We can then calculate a p-value of the observed assortativity as the probability
+that it falls within the distribution of permuted scores.
+
+```{r permutationTest}
+# To speed up the calculation save the weighted adjacency matrix first
+G.adj = as_adjacency_matrix(G,attr = "weight",sparse = T)
+
+# Number of permutations k
+k = 200
+
+r.perm = vector(length = k) 
+
+for (i in 1:k){
+  s = X.vertices$concreteness %>% sample(,replace = F)
+  r.perm[i] = assortment.continuous(G.adj,  
+                    vertex_values = s,
+                    weighted = T,
+                    na.rm = T)$r
+}
+
+X.perm = tibble(r_perm = r.perm, measure = 'concreteness')
+```
+
+```{r plotPermutations, fig.show=T}
+fig.perm = ggplot(X.perm,aes(x = r_perm)) + 
+  geom_histogram(bins = 20, color = 'black') + 
+  geom_vline(xintercept = S.assort$concreteness$r, linetype="dashed", 
+                color = "orangered3", linewidth = 0.6) +
+  ggtitle('Permutation test of concreteness assortativity') + 
+  theme_minimal()
+```
+
+
+## Scatter plots
+
+To plot the results we'll make use of the [UMAP algorithm](https://github.com/lmcinnes/umap), a dimension reduction technique that can be used for visualisation of large datasets similar
+to t-SNE that's included in the [graphlayouts](https://github.com/schochastics/graphlayouts) package.
+
+
+```{r generateLayout}
+#X.coords = layout_igraph_umap(G,pivots = 50,min_dist = 0.1)
+X.coords = graphlayouts::layout_igraph_pmds(G, pivots = 40)
+
+X.coords %<>% as_tibble() %>% select(word = name,x,y)
+X.coords = inner_join(X.coords,X.vertices,by = 'word')
+```
+
+
+```{r plotAssortativity}
+fig.asso.conc = ggplot(X.coords, aes(x = x,y = y,colour = concreteness)) + 
+  geom_point(size = 1.1, alpha = 0.6, stroke = NA) +
+  scale_colour_viridis(option = 'rocket') + 
+  coord_fixed() +
+  theme_void() + theme(legend.position="bottom")
+
+fig.asso.val = ggplot(X.coords, aes(x = x,y = y,colour = valence)) + 
+  geom_point(size = 1.1, alpha = 0.6,stroke = NA) +
+  scale_colour_viridis(option = 'rocket') + 
+  coord_fixed() +
+  theme_void() + theme(legend.position="bottom")
+
+
+fig.asso.wf = ggplot(X.coords, aes(x = x,y = y,colour = logWF)) + 
+  geom_point(size = 1.1, alpha = 0.6, stroke = NA) +
+  scale_colour_viridis(option = 'rocket') + 
+  coord_fixed() +
+  theme_void() + theme(legend.position="bottom")
+
+fig.asso.pos = ggplot(X.coords %>% 
+                      filter(POS %in% c('Adjective','Noun','Verb')) %>%
+                      mutate(POS = as.factor(POS)),
+                      aes(x = x,y = y,colour = POS)) + 
+  geom_point(size = 1.1, alpha = 0.6,stroke = NA) +
+  scale_colour_brewer(palette = 'Set1') + 
+  coord_fixed() +
+  theme_void() + theme(legend.position="bottom")
+
+grid.arrange(fig.asso.conc, fig.asso.val,
+             fig.asso.wf, fig.asso.pos,ncol = 2)
+```
+
+
+# Further reading
+The *assortativity effects* in word association data are related to a host of other findings. One example is the finding of switching costs between modalities, which is often cited as evidence for experiential processing of meaning.
+In a study by @pecher2003, participants had to perform property verification task. They found that pairs such as **BLENDER - loud** was slower after verifying a pair that involved a different sensory modality such as **CRANBERRY - sour**, suggesting a switching cost between trials.
+
+Another example is the the role of gender in Rioplatense Spanish using SWOW [@cabana2023], showing that participants match the gender of cue and response in word association tasks in about 60% of reponses.
+
+
+
+For an empirical of assortative mixing in a different domain (birds), check out the demo from Dai Shizuka on the [experimental assortment
+of birds](https://dshizuka.github.io/networkanalysis/example_assortment_in_wytham.html), which formed inspiration for the current workbook.
+
+# Exercises
+* Compare walktrap solutions for different number of steps using NMI. Do the clustering solutions converge?
+* Infomap is a stochastic algorithm. Repeat the analysis of the Infomap procedure and
+determine how stable the solutions are. (Hint: like before, you could look at the `compare` function to get a score.)
+* Imagine you have a set of semantic category labels and members (e.g. fruit, professions, insects). Think about how you could check the presence of taxonomic structure using community detection and assortativity. Consider what a comparison between languages could tell you.
+
+# References

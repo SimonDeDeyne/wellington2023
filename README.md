@@ -1,7 +1,6 @@
 
 
 # Wellington Vocabulary Research Summer School
-test
 
 ## An introduction to multi-scale semantic network analysis
 
