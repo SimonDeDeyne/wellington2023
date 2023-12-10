@@ -168,18 +168,18 @@ We'll need a special package to extend igraphs' basic functionality to weighed n
 
 
 ```{r loadProperties}
-file.concreteness = '../../data/concreteness/english.concreteness.Brysbaert2016.csv'
+file.concreteness = '../data/concreteness/english.concreteness.Brysbaert2016.csv'
 X.con = read_delim(file.concreteness,delim = '\t')
 X.con %<>% select(word = Word, concreteness = Conc.M)
 
-file.valence = '../../data/valenceArousal/VADRatingsWarriner2013.csv'
+file.valence = '../data/valenceArousal/VADRatingsWarriner2013.csv'
 X.val = read_csv(file.valence)
 X.val %<>% select(word = Word, 
                  valence = V.Mean.Sum, 
                  arousal = A.Mean.Sum, 
                  dominance = D.Mean.Sum)
 
-file.wf = '../../data/wordFrequency/subtlex_us.csv'
+file.wf = '../data/wordFrequency/subtlex_us.csv'
 X.wf = read_csv(file.wf)
 X.wf %<>% select(word = Word, logWF = Lg10WF,POS = Dom_PoS_SUBTLEX,pctPOS = Percentage_dom_PoS)
 
@@ -285,6 +285,8 @@ fig.perm = ggplot(X.perm,aes(x = r_perm)) +
                 color = "orangered3", linewidth = 0.6) +
   ggtitle('Permutation test of concreteness assortativity') + 
   theme_minimal()
+
+print(fig.perm)
 ```
 
 
@@ -339,7 +341,7 @@ grid.arrange(fig.asso.conc, fig.asso.val,
 
 # Further reading
 The *assortativity effects* in word association data are related to a host of other findings. One example is the finding of switching costs between modalities, which is often cited as evidence for experiential processing of meaning.
-In a study by @pecher2003, participants had to perform property verification task. They found that pairs such as **BLENDER - loud** was slower after verifying a pair that involved a different sensory modality such as **CRANBERRY - sour**, suggesting a switching cost between trials.
+In a study by @pecher2003, participants had to perform property verification task. They found that pairs such as *BLENDER - loud* was slower after verifying a pair that involved a different sensory modality such as *CRANBERRY - sour*, suggesting a switching cost between trials.
 
 Another example is the the role of gender in Rioplatense Spanish using SWOW [@cabana2023], showing that participants match the gender of cue and response in word association tasks in about 60% of reponses.
 
@@ -349,7 +351,6 @@ For an empirical of assortative mixing in a different domain (birds), check out 
 of birds](https://dshizuka.github.io/networkanalysis/example_assortment_in_wytham.html), which formed inspiration for the current workbook.
 
 # Exercises
-* Compare walktrap solutions for different number of steps using NMI. Do the clustering solutions converge?
 * Infomap is a stochastic algorithm. Repeat the analysis of the Infomap procedure and
 determine how stable the solutions are. (Hint: like before, you could look at the `compare` function to get a score.)
 * Imagine you have a set of semantic category labels and members (e.g. fruit, professions, insects). Think about how you could check the presence of taxonomic structure using community detection and assortativity. Consider what a comparison between languages could tell you.

@@ -37,7 +37,7 @@ It covers the role of edge weights and includes a method based on the Katz index
 
 # Create network
 ```{r importGraph,message=FALSE}
-load('../../data/WAT/USF.rda')
+load('../data/WAT/USF.rda')
 X = USF %>% as_tibble()
 
 # Remove loops
@@ -131,7 +131,7 @@ print(cosineMatrix(G.ppmi[c('pizza','pasta','chocolate','red'),]))
 <br>
 The results mostly make sense, but we also observe that *red* is not at all related or similar to *pizza* or *pasta*. How come?
 Let's see if they share any neighbors.
-```{r}
+```{r nnbExamples}
 nb_pasta = igraph::neighbors(G.ppmi,'pasta')
 nb_red = igraph::neighbors(G.ppmi,'red')
 nb_pasta_s = paste(names(nb_pasta),collapse = ', ')
@@ -166,17 +166,17 @@ The result is a path-augmented graph `G.rw`, which include weighted sum of all p
 *PPMI.* is known to have a bias for rare events, which does not affect typical word associations graphs with n < 12,000 words, but becomes a concern for larger graphs [@Turney2010]. In such cases, weighted PPMI versions can be considered [e.g. @Levy2015]. ^[The Katz index code can be slow in R (approx 166 seconds on my laptop).]
 ```{r performRandomWalk}
 alpha_p = 0.75
-P = Matrix::as.matrix(G.ppmi)
+P = as_adj(G.ppmi,attr = 'weight')
 I = diag(1, dim(P)[1]);
 tic()
-K = solve(I - alpha_p*P);
+K = solve(I - alpha_p * P);
 toc()
 P = PPMI(K)
 diag(P) = 0
 P = normalize(P,'l1')
 labels = rownames(P)
-G.rw = igraph::graph_from_adjacency_matrix(Matrix::as.matrix(P),weighted = TRUE)
-igraph::V(G.rw)$name = labels
+G.rw = graph_from_adjacency_matrix(Matrix::as.matrix(P),weighted = TRUE)
+V(G.rw)$name = labels
 ```
 The edge density of the original graph was `r igraph::edge_density(G.ppmi)`, which increased in the augmented `G.rw` graph where the edge density is now `r igraph::edge_density(G.rw)`.
 `
@@ -208,7 +208,7 @@ Finding an indirect link between *pasta* and *red* will depend on the value of $
 Which measure performs best in predicting similarity and relatedness between words? How well can we predict ratings using just  associative strength? 
 To find answers to these questions we'll make use of publicly available similarity and relatedness datasets.
 ```{r}
-file.similarity = '../../data/similarityRatings/simRatings.csv'
+file.similarity = '../data/similarityRatings/simRatings.csv'
 X.ratings = read_delim(file.similarity,delim = ',')
 
 # Extract unique word list from the ratings that are also in the list of vertices 
@@ -231,7 +231,7 @@ pairs = X.ratings %>% mutate(WordA = as.character(WordA),WordB = as.character(Wo
 # Calculate strength similarity
 S.strength = cosineMatrix(G.strength[wordlist,])
 S.ppmi = cosineMatrix(G.ppmi[wordlist,])
-S.rw = cosineMatrix(G.rw[wordlist,])
+S.rw = cosineMatrix(G.rw[wordlist,]) # Check storage (slow)
 
 X.sim = tibble('WordA' =pairs$WordA, 'WordB' = pairs$WordB,
                  'cos_strength' = S.strength[cbind(pairs$WordA,pairs$WordB)],

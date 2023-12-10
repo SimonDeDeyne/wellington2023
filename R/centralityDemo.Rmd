@@ -119,7 +119,7 @@ In this case, there's one large component, and 52 components that correspond to 
 Extracting the strongest component means each word has at least one in- and out-going link $k_{in} \geq 1, k_{out} \geq 1$. This implies that only a subset of response words is retained, namely those that are in the list of cues that occur at least once in the list of responses. It is important to reflect on what this censoring means when calculating different types of centrality estimates.
 
 ```{r calculateCoverage}
-X %<>% mutate(isCue = ifelse(response %in% Freq.cues$cue),1,0)
+X %<>% mutate(isCue = ifelse(response %in% X$cue,1,0))
 
 X.cover = X %>% filter(isCue ==1) %>% 
   group_by(cue) %>% 
@@ -129,7 +129,7 @@ DT::datatable(X.cover)
 ```
 
 
-```{r plotCoverage, fig.show=T}
+```{r plotCoverage, fig.show=T,fig.width=5}
 fig.coverage = ggplot(X.cover, aes(x = coverage)) + 
   geom_histogram(color = 'black',bins = 30,alpha = 0.6) + 
   geom_vline(xintercept = median(X.cover$coverage), linetype="dashed", 
@@ -172,7 +172,7 @@ Local centrality measures considers how a node is connected with its direct neig
 
 <center>
 ![Illustration of in and out-degree](../figures/in_out_degree.jpg)
-
+</center>
 
 ```{r centralityTable, warning=FALSE}
 ct_k = tibble(names  = vlabels,
@@ -423,7 +423,7 @@ Concreteness effects refer to an advantage in processing concrete over abstract 
 We'll make use of the @Brysbaert2014 concreteness ratings for a large set of English words.
 
 ```{r correlationConcreteness}
-file.concreteness = '../../data/concreteness/english.concreteness.Brysbaert2016.csv'
+file.concreteness = '../data/concreteness/english.concreteness.Brysbaert2016.csv'
 X.con = readr::read_delim(file.concreteness,delim = '\t')
 X.con = inner_join(X.ct,X.con,by = c('names'= 'Word'))
 
@@ -455,7 +455,7 @@ A first dataset that can shed some light on this is the CSDP data. These data in
 
 ```{r correlationCSDP}
 # Load Calgary Semantic Decision Project Data
-file.CSD = '../../data/CalgarySemanticDecision/CalgarySemanticDecisionSummary.csv'
+file.CSD = '../data/CalgarySemanticDecision/CalgarySemanticDecisionSummary.csv'
 X.csdp = read_csv(file.CSD) 
 X.csdp %<>% select(word,wordType,RT = zRTclean_mean,accuracy = ACC,concreteRating)
 
@@ -496,7 +496,7 @@ print(summary(m.csdp))
 
 Finally, let's take at the @Mandera2020 English Word Prevalence RT data. These RTs measure how long it takes for participants to judge whether they "know" a word.
 ```{r}
-file.prevalence = '../../data/EnglishLexiconProject/ELPzScores.csv'
+file.prevalence = '../data/EnglishLexiconProject/ELPzScores.csv'
 X.ecd = read_csv(file.prevalence)
 X.ecd  %<>% select(word = Word,
                     length = Length, 
@@ -531,13 +531,7 @@ fig.ecd
 
 
 # Exercises
-* There are many centrality values and its far from obvious which one is best to use. One criterion could be the robustness of the measure. Calculate the centrality for the `EAT` and `Sw.en` networks as well and correlate the centrality across these three networks.
-Consider loading the size-matched versions of these datasets as follows
-```{r exercise1}
-load('../data/WAT/EAT.rda')
-```
-
-How certain are you that the values are comparable? What factors play a role? Why are certain measures more robust than others?
+* There are many centrality values and its far from obvious which one is best to use. One criterion could be the robustness of the measure. Calculate the centrality for the `EAT` and `Sw.en` networks as well and correlate the centrality across these three networks. How certain are you that the values are comparable? What factors play a role? Why are certain measures more robust than others?
 
 
 * So far we have used associative strength to construct weighted networks. What do you expect for `PPMI` or `RW` networks? Hint: Think about the type of semantic relations and the density of the graph.
