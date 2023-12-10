@@ -48,7 +48,6 @@ To build a graph, all we need is a table where each row defines an edge based on
 load('../data/WAT/USF.rda') %>% as_tibble()
 X = USF
 
-
 # Remove loops
 X %<>% filter(cue != response)
 
@@ -61,14 +60,18 @@ X %<>% filter(cue != response)
 cue.freq = X %>% group_by(cue) %>% summarise(total = sum(R1))
 X = left_join(X,cue.freq,by = 'cue') %>% mutate(R1.Strength =  R1/total)
 
-
 # Import the graph
 G = graph_from_data_frame(X %>% select(from = cue,to=response),directed = T)
 G = set_edge_attr(G,'weight',value = X$R1.Strength)
 
-
-
 ```
+
+The adjacency matrix is a different representation of a graph where each row and column corresponds to a node, and the cells represent the absence or presence of an edge. In this case, these cells are values between 0 and 1 suggesting a *weighted* adjacency matrix.
+```{r adjacency}
+G[c('island','sun','tropical','vacation','fern','office'),
+  c('island','sun','tropical','vacation','fern','office')]
+```
+
 
 In some cases, participants did respond with the same word as the cue word, so these are removed.
 
@@ -115,6 +118,30 @@ In this case, there's one large component, and 52 components that correspond to 
 ### Coverage
 Extracting the strongest component means each word has at least one in- and out-going link $k_{in} \geq 1, k_{out} \geq 1$. This implies that only a subset of response words is retained, namely those that are in the list of cues that occur at least once in the list of responses. It is important to reflect on what this censoring means when calculating different types of centrality estimates.
 
+```{r calculateCoverage}
+X %<>% mutate(isCue = ifelse(response %in% Freq.cues$cue),1,0)
+
+X.cover = X %>% filter(isCue ==1) %>% 
+  group_by(cue) %>% 
+  summarise(coverage = sum(R1.Strength))
+
+DT::datatable(X.cover)
+```
+
+
+```{r plotCoverage, fig.show=T}
+fig.coverage = ggplot(X.cover, aes(x = coverage)) + 
+  geom_histogram(color = 'black',bins = 30,alpha = 0.6) + 
+  geom_vline(xintercept = median(X.cover$coverage), linetype="dashed", 
+                color = "orangered2", size=0.7) +
+  theme_bw()
+
+print(fig.coverage)
+```
+
+
+For this dataset, the median coverage is `r `median(X.cover$coverage)`, which suggests that the amount of censoring is relatively small.
+
 ## Macro-level descriptives
 The macro-level descriptives provide information about the number of nodes and edges, the density of the network and the diameter.
 
@@ -130,7 +157,7 @@ S.global$diameterPath = get_diameter(G)
 
 S.global$cc = transitivity(G,'global') # global clustering coefficient
 
-print.simple.list(S.global)
+#print.simple.list(S.global)
 ```
 
 The network consists of `r S.global$nNodes` nodes and `r S.global$nEdges` edges.
@@ -142,6 +169,10 @@ In this network the longest path has a length of `r length(S.global$diameterPath
 
 ## Local centrality measures
 Local centrality measures considers how a node is connected with its direct neighbors. This includes measures such as the number of incoming edges (`in-degree` $k_{in}$), the number of outgoing edges (`out-degree` $k_{out}) and weighted versions of these measures (*strength*).
+
+<center>
+![Illustration of in and out-degree](../figures/in_out_degree.jpg)
+
 
 ```{r centralityTable, warning=FALSE}
 ct_k = tibble(names  = vlabels,
